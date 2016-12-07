@@ -24,7 +24,7 @@ public class DatasetViewer extends DatasetViewerBase {
 	private static final long serialVersionUID = -6288314471660252417L;
 
 	/**
-	 * TODO Calculate the mean color of all given images. Or return PINK if there are no images.
+	 * Calculate the mean color of all given images. Or return PINK if there are no images.
 	 * 
 	 * @param imageFiles
 	 * @return
@@ -84,17 +84,81 @@ public class DatasetViewer extends DatasetViewerBase {
 	}
 	
 	/**
-	 * TODO Calculate the mean image of all given images. Or return NULL if there are no images.
-	 * 
+	 * Calculate the mean image of all given images. Or return NULL if there are no images.
+	 * TODO needs to be improved for having very bad performance on getRGB() per pixel per image
 	 * @param imageFiles
 	 * @return
 	 */
 	public BufferedImage getMeanImage(File ... imageFiles) {
+
+		BufferedImage images[] = new BufferedImage[imageFiles.length];
+		for (int i = 0; i < imageFiles.length; i++) {
+			BufferedImage currentImg = null;
+			try {
+				// Read Image from file system
+				currentImg = ImageIO.read(imageFiles[i]);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
+			// ensure color spectrum is in a correct RGB
+			currentImg = ensureCorrectColorSpectrum(currentImg);
+			images[i] = currentImg;
+		}
 		
-		// no images? return null
-		if(imageFiles.length == 0) return null;		
+		// Prepare new bufferdImage that can be used to add the avr Color per pixel later on
+		BufferedImage average = new BufferedImage(images[0].getWidth(), images[0].getHeight(), BufferedImage.TYPE_INT_RGB);
+		int width = average.getWidth();
+		int height = average.getHeight();		
+		int avrPixels[] = new int[width * height];
+
+		//calculate mean color per pixel
+		for (int pixelPointer = 0; pixelPointer < avrPixels.length; pixelPointer++) {
+			
+			int avrRed = 0;
+			int avrGreen = 0;
+			int avrBlue = 0;
+
+			int currentRed = 0;
+			int currentGreen = 0;
+			int currentBlue = 0;
+			
+			for (BufferedImage currentImage : images) {
+				
+				int currentWidth = currentImage.getWidth();
+				int currenHeight = currentImage.getHeight();	
+				int crntPixels[] = new int[currentWidth * currenHeight];
+				
+				/*
+				 * TODO getRGB() ist zu teuer für jedes Pixel
+				 */
+				currentImage.getRGB(0, 0, currentWidth, currenHeight, crntPixels, 0, currentWidth); 
+				
+				int crntRGB = crntPixels[pixelPointer];
+				int r 	= (crntRGB >> 16) & 0xff; 
+				int g	= (crntRGB >> 8) & 0xff;
+				int b	= (crntRGB >> 0) & 0xff;
+				
+				currentRed += r;
+				currentGreen += g;
+				currentBlue += b;
+			}
+			
+			avrRed = currentRed/imageFiles.length;
+			avrGreen = currentGreen/imageFiles.length;
+			avrBlue = currentBlue/imageFiles.length;
+				
+			// Calculate average per pixel
+			avrRed 		= preventColorOverflow(avrRed);
+			avrGreen 	= preventColorOverflow(avrGreen);
+			avrBlue 	= preventColorOverflow(avrBlue);
+						
+			avrPixels[pixelPointer] =  (avrRed << 16) | (avrGreen << 8) | avrBlue;
+		}
 		
-		return null; 
+		average.setRGB(0, 0, width, height, avrPixels, 0, width); 	// very slow performance on MacBook Air
+		
+		return average;
 	}
 	
 	/**

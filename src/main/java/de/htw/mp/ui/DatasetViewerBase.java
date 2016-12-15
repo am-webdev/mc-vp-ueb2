@@ -541,7 +541,7 @@ public abstract class DatasetViewerBase extends JPanel {
 	}
 	
 	/**
-	 * TODO Calculate the mean color of all given images. Or return PINK if there are no images.
+	 * Calculate the mean color of all given images. Or return PINK if there are no images.
 	 * 
 	 * @param imageFiles
 	 * @return
@@ -549,7 +549,7 @@ public abstract class DatasetViewerBase extends JPanel {
 	public abstract Color getMeanColor(File ... imageFiles);
 	
 	/**
-	 * TODO Calculate the mean images of all given images. Or return NULL if there are no images.
+	 * Calculate the mean images of all given images. Or return NULL if there are no images.
 	 * 
 	 * @param imageFiles
 	 * @return

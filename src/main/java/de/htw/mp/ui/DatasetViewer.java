@@ -5,8 +5,14 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import javax.imageio.ImageIO;
@@ -85,13 +91,13 @@ public class DatasetViewer extends DatasetViewerBase {
 	
 	/**
 	 * Calculate the mean image of all given images. Or return NULL if there are no images.
-	 * TODO needs to be improved for having very bad performance on getRGB() per pixel per image
 	 * @param imageFiles
 	 * @return
 	 */
 	public BufferedImage getMeanImage(File ... imageFiles) {
 
 		BufferedImage images[] = new BufferedImage[imageFiles.length];
+		List<int[]> imagePixels = new ArrayList<int[]>(); 
 		for (int i = 0; i < imageFiles.length; i++) {
 			BufferedImage currentImg = null;
 			try {
@@ -104,8 +110,10 @@ public class DatasetViewer extends DatasetViewerBase {
 			// ensure color spectrum is in a correct RGB
 			currentImg = ensureCorrectColorSpectrum(currentImg);
 			images[i] = currentImg;
+			int pixels[] = new int[currentImg.getHeight() * currentImg.getWidth()];
+			imagePixels.add(currentImg.getRGB(0, 0, currentImg.getWidth(), currentImg.getHeight(), pixels, 0, currentImg.getWidth()));
 		}
-		
+	
 		// Prepare new bufferdImage that can be used to add the avr Color per pixel later on
 		BufferedImage average = new BufferedImage(images[0].getWidth(), images[0].getHeight(), BufferedImage.TYPE_INT_RGB);
 		int width = average.getWidth();
@@ -123,16 +131,9 @@ public class DatasetViewer extends DatasetViewerBase {
 			int currentGreen = 0;
 			int currentBlue = 0;
 			
-			for (BufferedImage currentImage : images) {
+			for (int i = 0; i < images.length; i++) {
 				
-				int currentWidth = currentImage.getWidth();
-				int currenHeight = currentImage.getHeight();	
-				int crntPixels[] = new int[currentWidth * currenHeight];
-				
-				/*
-				 * TODO getRGB() ist zu teuer für jedes Pixel
-				 */
-				currentImage.getRGB(0, 0, currentWidth, currenHeight, crntPixels, 0, currentWidth); 
+				int crntPixels[] = imagePixels.get(i);
 				
 				int crntRGB = crntPixels[pixelPointer];
 				int r 	= (crntRGB >> 16) & 0xff; 
@@ -156,13 +157,13 @@ public class DatasetViewer extends DatasetViewerBase {
 			avrPixels[pixelPointer] =  (avrRed << 16) | (avrGreen << 8) | avrBlue;
 		}
 		
-		average.setRGB(0, 0, width, height, avrPixels, 0, width); 	// very slow performance on MacBook Air
+		average.setRGB(0, 0, width, height, avrPixels, 0, width);
 		
 		return average;
 	}
 	
 	/**
-	 * TODO Sort the elements in the database based on the similarity to the search query.
+	 * Sort the elements in the database based on the similarity to the search query.
 	 * The similarity will be calculated between to features. Features are are stored in
 	 * the FeatureContainer and the FeatureType specifies which feature should be used.
 	 *  
@@ -172,9 +173,68 @@ public class DatasetViewer extends DatasetViewerBase {
 	 * @return sorted list of database elements
 	 */
 	public List<FeatureContainer> retrieve(FeatureContainer query, FeatureContainer[] database, FeatureType featureType) {
-		return Arrays.stream(database).collect(Collectors.toList());
+		
+		Map<Double, FeatureContainer> map = new TreeMap<Double, FeatureContainer>(); 
+		
+		// based on featureType, generate a list with values compared to the database
+		for (FeatureContainer f : database) {
+			map.put(getDistanceBy(featureType, query, f), f);
+		}
+		
+		// sort "list"
+		List<FeatureContainer> sortedDatabase = new ArrayList<FeatureContainer>();
+		
+		for(Map.Entry<Double,FeatureContainer> entry : map.entrySet()) {
+			sortedDatabase.add(entry.getValue());
+	    }
+		
+		return sortedDatabase;
 	}
 	
+	private Double getDistanceBy(FeatureType featureType, FeatureContainer origin, FeatureContainer current) {
+		double rtn = 0d;
+		switch(featureType) {
+			case MeanColor:
+				// calculate color difference between a and b
+				rtn = getColorDistance(origin.getMeanColor(), current.getMeanColor());
+				break;
+			case MeanImage:
+				// calculate image difference between a and b
+				int pixels[] = new int[origin.getMeanImage().getHeight() * origin.getMeanImage().getWidth()];
+				for (int i = 0; i < pixels.length; i++) {
+					int diff = 0;
+					
+					int crntRGB = pixels[i];
+					int crntR 	= (crntRGB >> 16) & 0xff; 
+					int crntG	= (crntRGB >> 8) & 0xff;
+					int crntB	= (crntRGB >> 0) & 0xff;
+					
+					int orgnRGB = pixels[i];
+					int orgnR 	= (orgnRGB >> 16) & 0xff; 
+					int orgnG	= (orgnRGB >> 8) & 0xff;
+					int orgnB	= (orgnRGB >> 0) & 0xff;
+					
+					diff += getColorDistance(new Color(orgnR, orgnG, orgnB), new Color(crntR, crntG, crntB));
+					
+					rtn = diff/pixels.length;
+				}
+				break;
+			}
+		return rtn;
+	}
+
+	private double getColorDistance(Color origin, Color current) {
+		int diffR = current.getRed() - origin.getRed();
+		int diffG = current.getGreen() - origin.getGreen();
+		int diffB = current.getBlue() - origin.getBlue();
+		
+		return Math.sqrt(
+					diffR*diffR +
+					diffG*diffG +
+					diffB*diffB
+				);
+	}
+
 	/**
 	 * TODO Predict the category.
 	 * Make the prediction based on the sorted list of features (images or categories). 

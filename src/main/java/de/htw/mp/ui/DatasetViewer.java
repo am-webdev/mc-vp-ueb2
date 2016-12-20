@@ -264,7 +264,7 @@ public class DatasetViewer extends DatasetViewerBase {
 			if (kmap.containsKey(sortedList.get(i).getCategory())) {
 				kmap.replace(sortedList.get(i).getCategory(), kmap.get(sortedList.get(i).getCategory())+1); 
 			} else {
-				// Initialze the counter with 1 if there is currently no entry for given key
+				// Initialize the counter with 1 if there is currently no entry for given key
 				kmap.put(sortedList.get(i).getCategory(), 1); 
 			}
 		}

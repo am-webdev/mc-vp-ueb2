@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -174,20 +175,28 @@ public class DatasetViewer extends DatasetViewerBase {
 	 */
 	public List<FeatureContainer> retrieve(FeatureContainer query, FeatureContainer[] database, FeatureType featureType) {
 		
-		Map<Double, FeatureContainer> map = new TreeMap<Double, FeatureContainer>(); 
+
+		List<FeatureWrapper> listUnsorted = new ArrayList<FeatureWrapper>();
 		
 		// based on featureType, generate a list with values compared to the database
-		for (FeatureContainer f : database) {
-			map.put(getDistanceBy(featureType, query, f), f);
+		for (FeatureContainer feature : database) {
+			listUnsorted.add(new FeatureWrapper(feature, getDistanceBy(featureType, query, feature)));
 		}
+
+		// sort "list" by new Comparator
+		Comparator<FeatureWrapper> vactorComparator = new Comparator<FeatureWrapper>() {				
+			@Override
+			public int compare(FeatureWrapper o1, FeatureWrapper o2) {
+				return Double.compare(o1.featureVector, o2.featureVector);
+			}
+		};
+		listUnsorted.sort(vactorComparator);
 		
-		// sort "list"
 		List<FeatureContainer> sortedDatabase = new ArrayList<FeatureContainer>();
 		
-		for(Map.Entry<Double,FeatureContainer> entry : map.entrySet()) {
-			sortedDatabase.add(entry.getValue());
+		for(FeatureWrapper entry : listUnsorted) {
+			sortedDatabase.add(entry.getFeature());
 	    }
-		
 		return sortedDatabase;
 	}
 	
@@ -244,7 +253,25 @@ public class DatasetViewer extends DatasetViewerBase {
 	 * @return predicted category
 	 */
 	public String classify(List<FeatureContainer> sortedList, int k) {
-		return sortedList.get(0).getCategory();
+		
+        Map<String, Integer> kmap = new TreeMap<String, Integer>();
+		
+		for (int i = 0; i < sortedList.size(); i++) {
+			if (i > k ) {
+				break;
+			}
+			// adds 1 to the current counter and given category
+			if (kmap.containsKey(sortedList.get(i).getCategory())) {
+				kmap.replace(sortedList.get(i).getCategory(), kmap.get(sortedList.get(i).getCategory())+1); 
+			} else {
+				// Initialze the counter with 1 if there is currently no entry for given key
+				kmap.put(sortedList.get(i).getCategory(), 1); 
+			}
+		}
+		
+		return ((TreeMap<String, Integer>) kmap).lastKey();
+		
+		
 	}
 	
 	private int preventColorOverflow(int singleColor) {
@@ -272,5 +299,20 @@ public class DatasetViewer extends DatasetViewerBase {
 			bufferedImage = biRGB;
 		}
 		return bufferedImage;
+	}
+	
+	public class FeatureWrapper {
+
+	    private FeatureContainer feature;
+	    private double featureVector;
+
+	    public FeatureWrapper(FeatureContainer feature, double featureVector) {
+	        this.feature = feature;
+	        this.featureVector = featureVector;
+	    }
+	    
+	    public FeatureContainer getFeature() {
+	    	return this.feature;
+	    }
 	}
 }
